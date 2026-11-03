@@ -19,3 +19,4 @@ services:
       name: sqlite-data
       mountPath: /app/backend/prisma
       sizeGB: 1
+

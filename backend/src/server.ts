@@ -1,5 +1,6 @@
 import { app } from './app';
 import { prisma } from './prisma';
+import { ensureDatabaseSeeded } from './seed';
 
 const PORT = process.env.PORT || 5000;
 
@@ -13,35 +14,45 @@ process.on('uncaughtException', (err: Error) => {
   console.error('CRITICAL: Uncaught Exception detected:', err?.stack || err?.message);
 });
 
-const server = app.listen(PORT, () => {
-  console.log(`====================================================`);
-  console.log(`Video Editing Agency Backend Server is running!`);
-  console.log(`Local URL: http://localhost:${PORT}`);
-  console.log(`Health Check: http://localhost:${PORT}/api/health`);
-  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`====================================================`);
-});
+async function bootstrap() {
+  try {
+    await ensureDatabaseSeeded();
+  } catch (err) {
+    console.warn('Initial database seed check failed or table not ready yet:', err);
+  }
 
-// Graceful shutdown handling
-const gracefulShutdown = async (signal: string) => {
-  console.log(`Received ${signal}. Shutting down gracefully...`);
-  server.close(async () => {
-    console.log('HTTP server closed.');
-    try {
-      await prisma.$disconnect();
-      console.log('Database disconnected.');
-    } catch (e) {
-      console.error('Error disconnecting database:', e);
-    }
-    process.exit(0);
+  const server = app.listen(PORT, () => {
+    console.log(`====================================================`);
+    console.log(`Video Editing Agency Backend Server is running!`);
+    console.log(`Local URL: http://localhost:${PORT}`);
+    console.log(`Health Check: http://localhost:${PORT}/api/health`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`====================================================`);
   });
 
-  setTimeout(() => {
-    console.error('Forced shutdown due to timeout.');
-    process.exit(1);
-  }, 10000);
-};
+  // Graceful shutdown handling
+  const gracefulShutdown = async (signal: string) => {
+    console.log(`Received ${signal}. Shutting down gracefully...`);
+    server.close(async () => {
+      console.log('HTTP server closed.');
+      try {
+        await prisma.$disconnect();
+        console.log('Database disconnected.');
+      } catch (e) {
+        console.error('Error disconnecting database:', e);
+      }
+      process.exit(0);
+    });
 
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+    setTimeout(() => {
+      console.error('Forced shutdown due to timeout.');
+      process.exit(1);
+    }, 10000);
+  };
+
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+}
+
+bootstrap();
 

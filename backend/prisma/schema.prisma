@@ -1,0 +1,184 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String      @id @default(cuid())
+  email        String      @unique
+  passwordHash String
+  name         String
+  role         String      @default("CLIENT") // ADMIN, EDITOR, CLIENT
+  status       String      @default("ACTIVE") // ACTIVE, INACTIVE
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  // Relationships
+  clientProfile          ClientProfile?
+  editorProfile          EditorProfile?
+  clientProjects         Project[]        @relation("ClientProjects")
+  editorProjects         Project[]        @relation("EditorProjects")
+  submissions            ProjectSubmission[]
+  notifications          Notification[]
+  auditLogs              AuditLog[]
+  internalNotes          InternalNote[]
+  projectMessages        ProjectMessage[]
+  sentDirectMessages     DirectMessage[]  @relation("SentDirectMessages")
+  receivedDirectMessages DirectMessage[]  @relation("ReceivedDirectMessages")
+}
+
+model ClientProfile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyName String?
+  phone       String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model EditorProfile {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  phone         String?
+  skills        String?  // Comma-separated or JSON list
+  experience    String?
+  portfolioLink String?
+  paymentRate   Float    @default(0.0)
+  internalNotes String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Project {
+  id                  String         @id @default(cuid())
+  projectCode         String         @unique
+  title               String
+  description         String
+  videoType           String         @default("General")
+  editingRequirements String?
+  referenceLink       String?
+  specDocUrl          String?
+  status              String         @default("NEW_REQUEST")
+  
+  currency            String         @default("USD") // USD, INR
+  clientBudget        Float?         // Budget proposed by client
+  adminQuoteNote      String?        // Admin counter-quote or negotiation note
+  
+  clientId            String
+  client              User           @relation("ClientProjects", fields: [clientId], references: [id])
+  
+  editorId            String?
+  editor              User?          @relation("EditorProjects", fields: [editorId], references: [id])
+  
+  clientPrice         Float          @default(0.0)
+  editorPayment       Float          @default(0.0)
+  
+  startDate           DateTime?
+  deadline            DateTime?
+  completedDate       DateTime?
+  finalDeliveryLink   String?
+  
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  submissions         ProjectSubmission[]
+  payments            Payment[]
+  messages            ProjectMessage[]
+  internalNotes       InternalNote[]
+}
+
+model ProjectSubmission {
+  id                String    @id @default(cuid())
+  projectId         String
+  project           Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  editorId          String
+  editor            User      @relation(fields: [editorId], references: [id])
+  deliveryLink      String
+  submissionMessage String?
+  version           Int       @default(1)
+  status            String    @default("PENDING_REVIEW") // PENDING_REVIEW, APPROVED, REVISION_REQUESTED
+  adminFeedback     String?
+  submittedAt       DateTime  @default(now())
+  reviewedAt        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+model Payment {
+  id            String      @id @default(cuid())
+  projectId     String
+  project       Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  type          String      // CLIENT_PAYMENT, EDITOR_PAYMENT
+  amount        Float
+  paymentMethod String      @default("Bank Transfer") // Bank Transfer, Stripe, PayPal, Cash, UPI, Other
+  paymentDate   DateTime    @default(now())
+  notes         String?
+  referenceId   String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  link      String?
+  type      String   @default("SYSTEM")
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model InternalNote {
+  id         String   @id @default(cuid())
+  projectId  String?
+  project    Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  authorId   String
+  author     User     @relation(fields: [authorId], references: [id])
+  content    String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model ProjectMessage {
+  id           String   @id @default(cuid())
+  projectId    String
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  senderId     String
+  sender       User     @relation(fields: [senderId], references: [id])
+  senderRole   String   // ADMIN, EDITOR, CLIENT
+  audience     String   // ADMIN_CLIENT (admin <-> client), ADMIN_EDITOR (admin <-> editor)
+  message      String
+  createdAt    DateTime @default(now())
+}
+
+model DirectMessage {
+  id         String   @id @default(cuid())
+  senderId   String
+  sender     User     @relation("SentDirectMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiverId String
+  receiver   User     @relation("ReceivedDirectMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+  content    String
+  isRead     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  action    String
+  entity    String
+  entityId  String
+  details   String?
+  ipAddress String?
+  createdAt DateTime @default(now())
+}

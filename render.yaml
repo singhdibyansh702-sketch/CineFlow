@@ -3,8 +3,7 @@ services:
     name: cineflow-agency
     env: node
     plan: free
-    region: oregon
-    buildCommand: "npm run build && cd backend && npx prisma generate && npx prisma db push && npx ts-node prisma/seed.ts"
+    buildCommand: "npm run build && cd backend && npx prisma generate && npx prisma db push"
     startCommand: "npm start"
     healthCheckPath: /api/health
     autoDeploy: true
@@ -14,9 +13,4 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: DATABASE_URL
-        value: "file:./prisma/dev.db"
-    disk:
-      name: sqlite-data
-      mountPath: /app/backend/prisma
-      sizeGB: 1
-
+        value: "file:./dev.db"
